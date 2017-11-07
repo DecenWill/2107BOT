@@ -13,25 +13,38 @@ from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, Conv2DTranspo
 from keras.optimizers import Adam
 from keras.callbacks import ModelCheckpoint
 from keras import backend as K
+import tensorflow as tf
 
 from data import load_train_data, load_test_data
 
 K.set_image_data_format('channels_last')  # TF dimension ordering in this code
 
-img_rows = 512
-img_cols = 512
+img_rows = 1024
+img_cols = 1024
 
 smooth = 1.
 
 
 def dice_coef(y_true, y_pred):
+    '''
     y_true_f = K.flatten(y_true)
     y_pred_f = K.flatten(y_pred)
-    #if K.sum(y_true_f) > 0.01:
+    pos_neg = tf.cast((K.sum(y_true_f) > 1), tf.float32)
+    y_pred_f_mask = y_true_f * y_pred_f
+    p_intersection = K.sum(y_true_f * y_pred_f_mask)
+    n_intersection = K.sum(y_true_f * y_pred_f)
+    p_coef = (2. * p_intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f_mask) + smooth)
+    n_coef = (2. * n_intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    return p_coef*pos_neg + n_coef*(1.-pos_neg)#*pos_neg#*pos_neg#(1. -  pos_neg)#p_coef * pos_neg + n_coef * 
+    
+    '''
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+ 
     #y_pred_f = y_true_f * y_pred_f
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
-
+    
 
 def dice_coef_loss(y_true, y_pred):
     return -dice_coef(y_true, y_pred)
@@ -78,7 +91,7 @@ def get_unet():
 
     model = Model(inputs=[inputs], outputs=[conv10])
 
-    model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
+    model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])#1e-5
 
     return model
 
@@ -117,13 +130,13 @@ def train_and_predict():
     print('Creating and compiling model...')
     print('-'*30)
     model = get_unet()
-    model_checkpoint = ModelCheckpoint('weights.h5', monitor='val_loss', save_best_only=True)
-
+    #model_checkpoint = ModelCheckpoint('weights.h5', monitor='val_loss', save_best_only=True)
+    model_checkpoint = ModelCheckpoint('weights/'+'weights-{epoch:02d}-{val_acc:.2f}.h5', monitor='val_loss', period=1)
     print('-'*30)
     print('Fitting model...')
     print('-'*30)
-    model.fit(imgs_train, imgs_mask_train, batch_size=16, nb_epoch=10, verbose=1, shuffle=True,
-              validation_split=0.2,
+    model.fit(imgs_train, imgs_mask_train, batch_size=4, nb_epoch=30, verbose=1, shuffle=True,
+              validation_split=0.05,
               callbacks=[model_checkpoint])
     
     print('-'*30)
