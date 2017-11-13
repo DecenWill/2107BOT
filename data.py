@@ -4,7 +4,7 @@ from __future__ import print_function
 import os
 import numpy as np
 
-#from skimage.io import imsave, imread, imshow 
+from skimage.io import imsave
 import cv2
 from cv2 import imwrite, imread, imshow
 from libtiff import TIFF  
@@ -12,15 +12,15 @@ from scipy import misc
 
 data_path = '../../2017final_data/'
 
-image_rows = 2048
-image_cols = 2048
+image_rows = 512
+image_cols = 512
 
 tiff_path = '../../2017final_data/negative'
 
 
 def create_train_data():
-    train_data_path = os.path.join(data_path, 'train_png_pre')
-    train_mask_path = os.path.join(data_path, 'maskall_png_pre')
+    train_data_path = os.path.join(data_path, 'train_png_patch_512')
+    train_mask_path = os.path.join(data_path, 'maskall_png_patch_512')
     images = os.listdir(train_data_path)
     total = len(images)
 
@@ -153,7 +153,7 @@ def image_array_to_tiff(image_dir, file_name, image_type, image_num):
     out_tiff.close()  
     return
 
-from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
+#from keras.preprocessing.image import ImageDataGenerator, array_to_img, img_to_array, load_img
 def NegaAugmentation(path):
     datagen = ImageDataGenerator(
         rotation_range=360,
@@ -250,14 +250,81 @@ def PosiAugmentation(source_image_path, image_path, source_mask_path, mask_path)
         mask_flipped_270 = cv2.warpAffine(mask_flipped,M,(2048,2048))
         imwrite(os.path.join(mask_path, image_name[0:-4] + '_flip_' + str(angle) + '.png'), mask_flipped_270)  
 
+def PosiPatch(source_image_path, image_path, source_mask_path, mask_path, size):
+    images = os.listdir(source_image_path)
+    
+    for image_name in images:
+        image_ori = imread(os.path.join(source_image_path,image_name))
+        mask_ori = imread(os.path.join(source_mask_path,image_name),0)
+        for i in range(2048/size*2-1):
+            for j in range(2048/size*2-1):
+                mask_patch = mask_ori[i*size/2:i*size/2+size,j*size/2:j*size/2+size]
+                temp = mask_patch.astype('float32')
+                print(sum(sum(temp)))
+                #print(mask_patch.all())
+                #assert 1==2            1000
+                if sum(sum(temp))/255 > 4*size:
+                    image_patch = image_ori[i*size/2:i*size/2+size,j*size/2:j*size/2+size]
+                    imwrite(os.path.join(image_path, image_name[0:-4] + '_' + str(i) + '_' + str(j) + '.png'), image_patch) 
+                    imwrite(os.path.join(mask_path, image_name[0:-4] + '_' + str(i) + '_' + str(j) + '.png'), mask_patch) 
+      
+def NegaPatch(source_image_path, image_path, source_mask_path, mask_path, size):
+    images = os.listdir(source_image_path)
+    
+    for image_name in images:
+        image_ori = imread(os.path.join(source_image_path,image_name))
+        mask_ori = imread(os.path.join(source_mask_path,image_name),0)
+        for i in range(2048/size*2-1):
+            for j in range(2048/size*2-1):
+                mask_patch = mask_ori[i*size/2:i*size/2+size,j*size/2:j*size/2+size]
+                temp = mask_patch.astype('float32')
+                print(sum(sum(temp)))
+                #print(mask_patch.all())
+                #assert 1==2
+                
+                image_patch = image_ori[i*size/2:i*size/2+size,j*size/2:j*size/2+size]
+                imwrite(os.path.join(image_path, image_name[0:-4] + '_' + str(i) + '_' + str(j) + '.png'), image_patch) 
+                imwrite(os.path.join(mask_path, image_name[0:-4] + '_' + str(i) + '_' + str(j) + '.png'), mask_patch)
+    
+# ------------------have been abandoned-----------------------      
+def TestPatch(source_image_path, image_path, size):
+    images = os.listdir(source_image_path)
+    
+    for image_name in images:
+        image_ori = imread(os.path.join(source_image_path,image_name))
+        for i in range(2048/size*2-1):
+            for j in range(2048/size*2-1):         
+                image_patch = image_ori[i*size/2:i*size/2+size,j*size/2:j*size/2+size]
+                imwrite(os.path.join(image_path, image_name[0:-4] + '_' + str(i) + '_' + str(j) + '.png'), image_patch) 
+                
+def Patch2Img(source_image_path, image_path, dest_path, size):
+    images = os.listdir(source_image_path)
+    
+    for image_name in images:
+        image_ori = imread(os.path.join(source_image_path,image_name),0)
+        for i in range(2048/size*2-1):
+            for j in range(2048/size*2-1):         
+                patch = imread(os.path.join(image_path,image_name[0:-4] + '_' + str(i) + '_' + str(j) + '.png'),0)
+                image_ori[i*size/2:i*size/2+size,j*size/2:j*size/2+size] = patch
+        image_ori = image_ori.astype(np.uint8)
+        #imsave(os.path.join(pred_dir, image_name[0:-5]+'.png'), image)       
+        imwrite(os.path.join(dest_path, image_name), image_ori) 
+#----------------------------------------------------------
+
 if __name__ == '__main__':
     
     #create_train_data()
-    create_test_data()
+    #create_test_data()
     
-    #source_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/temp'
-    #mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/maskall_png_pre'
-    #create_negative_mask(source_path, mask_path)
+    #-------------------------------------------------------------------------------
+    #1.Create negative_mask (function: create_negative_mask(), source_path: negative(png), mask_path: dest)
+    #2.Positive image to patch (function: PosiPatch())
+    #3.Negative image to patch (function: NegaPatch())
+    #-------------------------------------------------------------------------------
+
+    source_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/temp'
+    mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/maskall_png_pre'
+    create_negative_mask(source_path, mask_path)
     
     #for filename in os.listdir(tiff_path):
         #tiff_to_image_array(tiff_path + '/' + filename, filename, '../../2017final_data/negative_png/', '.png')
@@ -268,3 +335,27 @@ if __name__ == '__main__':
     #source_mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/posi_mask'
     #mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/posi_mask_argu'
     #PosiAugmentation(source_image_path, image_path, source_mask_path, mask_path)
+
+    source_image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/positive_png'
+    image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/train_png_patch_512'
+    source_mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/posi_mask'
+    mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/maskall_png_patch_512'    
+    size = 512
+    PosiPatch(source_image_path, image_path, source_mask_path, mask_path, size)
+    
+    source_image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/negative_png'
+    image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/train_png_patch_512'
+    source_mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/nega_mask'
+    mask_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/maskall_png_patch_512' 
+    NegaPatch(source_image_path, image_path, source_mask_path, mask_path, size)
+
+    
+    #source_image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/my_test'
+    #image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/my_test_patch_256'
+    #TestPatch(source_image_path, image_path, 256)
+
+    #source_image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/stage2_test_500'
+    #image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/code/master-code/preds'
+    #dest_path = 'preds_img'
+    #Patch2Img(source_image_path, image_path, dest_path, size)
+ 
