@@ -19,8 +19,8 @@ from data import load_train_data, load_test_data
 
 K.set_image_data_format('channels_last')  # TF dimension ordering in this code
 
-img_rows = 1024
-img_cols = 1024
+img_rows = 256
+img_cols = 256
 
 smooth = 1.
 
@@ -131,12 +131,18 @@ def train_and_predict():
     print('-'*30)
     model = get_unet()
     #model_checkpoint = ModelCheckpoint('weights.h5', monitor='val_loss', save_best_only=True)
-    model_checkpoint = ModelCheckpoint('weights/'+'weights-{epoch:02d}-{val_acc:.2f}.h5', monitor='val_loss', period=1)
+    model_checkpoint = ModelCheckpoint('weights/'+'weights-{epoch:02d}-{loss:.2f}-{val_loss:.2f}.h5', monitor='val_loss', period=1)
+
+    print('-'*30)
+    print('Loading saved weights...')
+    print('-'*30)
+    model.load_weights('weights/weights-29--0.77.h5')
+
     print('-'*30)
     print('Fitting model...')
     print('-'*30)
-    model.fit(imgs_train, imgs_mask_train, batch_size=4, nb_epoch=30, verbose=1, shuffle=True,
-              validation_split=0.05,
+    model.fit(imgs_train, imgs_mask_train, batch_size=32, nb_epoch=30, verbose=1, shuffle=True,
+              validation_split=0.01,
               callbacks=[model_checkpoint])
     
     print('-'*30)
