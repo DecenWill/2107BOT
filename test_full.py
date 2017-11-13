@@ -2,7 +2,7 @@ from __future__ import print_function
 import cv2
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 from keras.models import Model    ####should be first?
 from skimage.transform import resize
 from skimage.io import imsave
@@ -18,8 +18,8 @@ from data import load_train_data, load_test_data
 
 K.set_image_data_format('channels_last')  # TF dimension ordering in this code
 
-img_rows = 512
-img_cols = 512
+img_rows = 2048
+img_cols = 2048
 
 smooth = 1.
 
@@ -27,13 +27,10 @@ smooth = 1.
 def dice_coef(y_true, y_pred):
     y_true_f = K.flatten(y_true)
     y_pred_f = K.flatten(y_pred)
-    pos_neg = (K.sum(y_true_f) > 0.01)
-    y_pred_f_mask = y_true_f * y_pred
-    p_intersection = K.sum(y_true_f * y_pred_f_mask)
-    n_intersection = K.sum(y_true_f * y_pred_f)
-    p_coef = (2. * p_intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f_mask) + smooth)
-    n_coef = (2. * n_intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
-    return p_coef * pos_neg + n_coef * (1 -  pos_neg)
+ 
+    #y_pred_f = y_true_f * y_pred_f
+    intersection = K.sum(y_true_f * y_pred_f)
+    return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
 
 def dice_coef_loss(y_true, y_pred):
@@ -131,16 +128,19 @@ def train_and_predict():
     print('-'*30)
     print('Loading saved weights...')
     print('-'*30)
-    model.load_weights('weights.h5')
+    model.load_weights('weights/weights-09--0.77--0.75.h5')
     print('-'*30)
     print('Loading and preprocessing test data...')
     print('-'*30)
-    train_data_path = "/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/stage2_pre_test_100/"
-    images = os.listdir("/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/stage2_pre_test_100")
+    
+    image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/stage2_test_500_patch_512'
+    source_image_path = '/home/ubuntu-lee/WangXD/2017BOT_TIA/final/2017final_data/stage2_test_500'
+    images = os.listdir(source_image_path)
+
     for image_name in images:
         imgs = np.ndarray((1, 2048, 2048), dtype=np.uint8)
-        imgs_test = imread(os.path.join(train_data_path, image_name), 0)
-        img = np.array([imgs_test])
+        image = imread(os.path.join(source_image_path,image_name),0)
+        img = np.array([image])
         imgs[0] = img
         imgs = preprocess(imgs)
         imgs = imgs.astype('float32')
@@ -151,23 +151,25 @@ def train_and_predict():
         print('Predicting masks on test data...')
         print('-'*30)
         imgs_mask_test = model.predict(imgs, verbose=1)
-        #np.save('imgs_mask_test.npy', imgs_mask_test)
 
         print('-' * 30)
         print('Saving predicted masks to files...')
         print('-' * 30)
-        pred_dir = 'preds'
+        pred_dir = 'preds_img'
 
         if not os.path.exists(pred_dir):
             os.mkdir(pred_dir)
         for image in imgs_mask_test:
-            image = ((image[:, :, 0]>0.15) * 255.).astype(np.uint8)
-            image[0:20,:] = 0
-            image[490:,:] = 0
-            image[:,0:20] = 0
-            image[:,490:] = 0
-            image = resize(image, (2048, 2048),preserve_range=True)
-            image = image.astype(np.uint8)
+
+            image = ((image[:, :, 0]>0.5) * 255.).astype(np.uint8)
+                   
+        
+            #image[0:8,:] = 0
+            #image[1016:,:] = 0
+            #image[:,0:8] = 0
+            #image[:,1016:] = 0
+            #image = resize(image, (2048, 2048),preserve_range=True)
+            #image = image.astype(np.uint8)
             imsave(os.path.join(pred_dir, image_name[0:-5]+'.png'), image)
 
 if __name__ == '__main__':
